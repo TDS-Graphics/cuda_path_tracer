@@ -1,8 +1,10 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cuda_runtime.h>
+#include <iostream>
+#include <string>
 
-// CUDA Error Checking Macro (Essential for debugging)
+
 #define CHECK_CUDA_ERROR(err) \
     if (err != cudaSuccess) { \
         fprintf(stderr, "CUDA Error: %s (Line: %d)\n", cudaGetErrorString(err), __LINE__); \
@@ -10,12 +12,16 @@
     }
 
 // Image Configuration
-const int IMG_WIDTH = 1280; // Image width (pixels)
-const int IMG_HEIGHT = 720; // Image height (pixels)
 const int CHANNELS = 3; // RGB 3 channels
 
-// ===================== Device-only Function (GPU only, cannot be called by CPU) =====================
-// Calculates and writes the RGB color for a single pixel (x, y)
+// ===================== Device-only Function =====================
+
+__device__ void CalculatePixel(float3 *color, int2 wh, int2 uv) {
+    color->x = uv.x / static_cast<float>(wh.x - 1);
+    color->y = uv.y / static_cast<float>(wh.y - 1);
+    color->z = 0.0;
+}
+
 __device__ void GenerateGradientPPM(
     unsigned char *d_pixels,
     int x, int y,
@@ -24,81 +30,78 @@ __device__ void GenerateGradientPPM(
     // Calculate the index of the current pixel in the flat array
     int pixel_idx = (y * width + x) * CHANNELS;
 
-    // Gradient Color Algorithm
-    auto r = static_cast<unsigned char>(x * 255.0f / width); // Red: Horizontal gradient (left→right)
-    auto g = static_cast<unsigned char>(y * 255.0f / height); // Green: Vertical gradient (top→bottom)
-    unsigned char b = 128; // Blue: Fixed value
+    float3 pixel_color{};
+    CalculatePixel(&pixel_color, {width, height}, {x, y});
 
-    // Write pixel data to GPU memory
-    d_pixels[pixel_idx + 0] = r;
-    d_pixels[pixel_idx + 1] = g;
-    d_pixels[pixel_idx + 2] = b;
+    d_pixels[pixel_idx + 0] = pixel_color.x * 255.999;
+    d_pixels[pixel_idx + 1] = pixel_color.y * 255.999;
+    d_pixels[pixel_idx + 2] = pixel_color.z * 255.999;
 }
 
-// ===================== Global Kernel (Only entry point callable by CPU) =====================
-// Computes thread coordinates and invokes the device-only gradient function
+// ===================== Global Kernel =====================
+
 __global__ void KernelMain(
     unsigned char *d_pixels,
     int width,
     int height
 ) {
-    // Calculate pixel coordinates (x: column, y: row)
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
 
-    // Boundary check: skip threads outside the image dimensions
     if (x >= width || y >= height) return;
 
-    // Invoke the device-only gradient generation function
     GenerateGradientPPM(d_pixels, x, y, width, height);
 }
 
-// Write pixel data to PPM image file (Binary P6 format)
 void WritePPM(const char *filename, unsigned char *pixels, int width, int height) {
-    FILE *fp = fopen(filename, "wb"); // Write binary mode
+    FILE *fp = fopen(filename, "wb");
     if (!fp) {
         fprintf(stderr, "Error: Failed to open file!\n");
         exit(EXIT_FAILURE);
     }
 
-    // Write PPM header (P6 = binary RGB, 255 = max color value)
     fprintf(fp, "P6\n%d %d\n255\n", width, height);
-    // Write raw pixel data
     fwrite(pixels, sizeof(unsigned char), width * height * CHANNELS, fp);
 
     fclose(fp);
     printf("Gradient image generated successfully: %s\n", filename);
 }
 
-// Main Function (CPU Host Code)
-int main() {
-    // Calculate total memory size for pixel data
+int main(int argc, char *argv[]) {
+    if (argc != 4) {
+        std::cerr << "Usage: " << argv[0] << " <image-name> <width> <height>\n";
+        return -1;
+    }
+    const unsigned int IMG_WIDTH = std::stoul(argv[2]);
+    const unsigned int IMG_HEIGHT = std::stoul(argv[3]);
+    const auto IMG_NAME = argv[1] == nullptr ? "unname" : std::string(argv[1]);
+
     size_t pixel_bytes = IMG_WIDTH * IMG_HEIGHT * CHANNELS * sizeof(unsigned char);
 
-    // Allocate host (CPU) memory
+    // Allocate host memory
     auto *h_pixels = static_cast<unsigned char *>(malloc(pixel_bytes));
     if (!h_pixels) {
         fprintf(stderr, "Error: Host memory allocation failed!\n");
         exit(EXIT_FAILURE);
     }
 
-    // Allocate device (GPU) memory
+    // Allocate device memory
     unsigned char *d_pixels;
     CHECK_CUDA_ERROR(cudaMalloc(&d_pixels, pixel_bytes));
 
-    // Configure CUDA grid and block dimensions (2D layout for 2D image)
-    dim3 block_size(16, 16); // 16x16 threads per block (CUDA best practice)
+    // Configure CUDA grid and block dimensions
+    dim3 thread_per_block(16, 16);
     dim3 grid_size(
-        (IMG_WIDTH + block_size.x - 1) / block_size.x,
-        (IMG_HEIGHT + block_size.y - 1) / block_size.y
+        (IMG_WIDTH + thread_per_block.x - 1) / thread_per_block.x,
+        (IMG_HEIGHT + thread_per_block.y - 1) / thread_per_block.y
     );
 
     // Launch CUDA kernel on GPU
     printf("Launching CUDA kernel...\n");
-    KernelMain<<<grid_size, block_size>>>(d_pixels, IMG_WIDTH, IMG_HEIGHT);
+    KernelMain<<<grid_size, thread_per_block>>>(d_pixels, IMG_WIDTH, IMG_HEIGHT);
 
-    // Check for kernel launch errors
     CHECK_CUDA_ERROR(cudaGetLastError());
+
     // Wait for GPU to finish execution
     CHECK_CUDA_ERROR(cudaDeviceSynchronize());
 
@@ -106,9 +109,9 @@ int main() {
     CHECK_CUDA_ERROR(cudaMemcpy(h_pixels, d_pixels, pixel_bytes, cudaMemcpyDeviceToHost));
 
     // Generate the final PPM image file
-    WritePPM("gradient.ppm", h_pixels, IMG_WIDTH, IMG_HEIGHT);
+    WritePPM(std::string(IMG_NAME + ".ppm").c_str(), h_pixels, IMG_WIDTH, IMG_HEIGHT);
 
-    // Free allocated memory (GPU first, then CPU)
+    // Free allocated memory
     CHECK_CUDA_ERROR(cudaFree(d_pixels));
     free(h_pixels);
 
