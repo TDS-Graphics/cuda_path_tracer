@@ -3,7 +3,10 @@ project(cuda_path_tracer CUDA)
 
 set(CMAKE_CUDA_STANDARD 20)
 
-add_executable(cuda_path_tracer main.cu)
+add_executable(${PROJECT_NAME} 
+        main.cu
+        camera.cuh
+        common.cuh
+)
 
-set_target_properties(cuda_path_tracer PROPERTIES
-        CUDA_SEPARABLE_COMPILATION ON)
+set_target_properties(${PROJECT_NAME} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)

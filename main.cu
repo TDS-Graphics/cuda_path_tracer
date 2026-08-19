@@ -1,32 +1,22 @@
-#include <cstdio>
-#include <cstdlib>
-#include <cuda_runtime.h>
-#include <iostream>
-#include <string>
-
-#define CHECK_CUDA_ERROR(err)                                                                                          \
-  if (err != cudaSuccess) {                                                                                            \
-    fprintf(stderr, "CUDA Error: %s (Line: %d)\n", cudaGetErrorString(err), __LINE__);                                 \
-    exit(EXIT_FAILURE);                                                                                                \
-  }
+#include "common.cuh"
 
 // Image Configuration
 const int CHANNELS = 3; // RGB 3 channels
 
 // ===================== Device-only Function =====================
 
-__device__ void CalculatePixel(float3 *color, int2 wh, int2 uv) {
-  color->x = uv.x / static_cast<float>(wh.x - 1);
-  color->y = uv.y / static_cast<float>(wh.y - 1);
-  color->z = 120.0;
+__device__ void CalculatePixel(float3 *color, int2 resolution, int2 uv) {
+  color->x = uv.x / static_cast<float>(resolution.x - 1);
+  color->y = uv.y / static_cast<float>(resolution.y - 1);
+  color->z = 0.5;
 }
 
-__device__ void CalculatePPM(unsigned char *d_pixels, int2 wh, int2 uv) {
+__device__ void CalculatePPM(unsigned char *d_pixels, int2 resolution, int2 uv) {
   // Calculate the index of the current pixel in the flat array
-  int pixel_idx = (uv.y * wh.x + uv.x) * CHANNELS;
+  int pixel_idx = (uv.y * resolution.x + uv.x) * CHANNELS;
 
   float3 pixel_color{};
-  CalculatePixel(&pixel_color, wh, uv);
+  CalculatePixel(&pixel_color, resolution, uv);
 
   d_pixels[pixel_idx + 0] = pixel_color.x * 255.999;
   d_pixels[pixel_idx + 1] = pixel_color.y * 255.999;
