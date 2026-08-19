@@ -18,15 +18,15 @@ const int CHANNELS = 3; // RGB 3 channels
 __device__ void CalculatePixel(float3 *color, int2 wh, int2 uv) {
   color->x = uv.x / static_cast<float>(wh.x - 1);
   color->y = uv.y / static_cast<float>(wh.y - 1);
-  color->z = 0.0;
+  color->z = 120.0;
 }
 
-__device__ void GenerateGradientPPM(unsigned char *d_pixels, int x, int y, int width, int height) {
+__device__ void CalculatePPM(unsigned char *d_pixels, int2 wh, int2 uv) {
   // Calculate the index of the current pixel in the flat array
-  int pixel_idx = (y * width + x) * CHANNELS;
+  int pixel_idx = (uv.y * wh.x + uv.x) * CHANNELS;
 
   float3 pixel_color{};
-  CalculatePixel(&pixel_color, {width, height}, {x, y});
+  CalculatePixel(&pixel_color, wh, uv);
 
   d_pixels[pixel_idx + 0] = pixel_color.x * 255.999;
   d_pixels[pixel_idx + 1] = pixel_color.y * 255.999;
@@ -42,7 +42,7 @@ __global__ void KernelMain(unsigned char *d_pixels, int width, int height) {
   if (x >= width || y >= height)
     return;
 
-  GenerateGradientPPM(d_pixels, x, y, width, height);
+  CalculatePPM(d_pixels, {width, height}, {x, y});
 }
 
 void WritePPM(const char *filename, unsigned char *pixels, int width, int height) {
@@ -56,7 +56,7 @@ void WritePPM(const char *filename, unsigned char *pixels, int width, int height
   fwrite(pixels, sizeof(unsigned char), width * height * CHANNELS, fp);
 
   fclose(fp);
-  printf("Gradient image generated successfully: %s\n", filename);
+  printf("PPM image generated successfully: %s\n", filename);
 }
 
 int main(int argc, char *argv[]) {
@@ -78,7 +78,7 @@ int main(int argc, char *argv[]) {
   }
 
   // Allocate device memory
-  unsigned char *d_pixels;
+  unsigned char *d_pixels = nullptr;
   CHECK_CUDA_ERROR(cudaMalloc(&d_pixels, pixel_bytes));
 
   // Configure CUDA grid and block dimensions
