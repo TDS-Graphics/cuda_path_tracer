@@ -1,4 +1,6 @@
+#include "camera.cuh"
 #include "common.cuh"
+#include "scene.cuh"
 
 // Image Configuration
 const int CHANNELS = 3; // RGB 3 channels
@@ -60,6 +62,16 @@ int main(int argc, char *argv[]) {
   const unsigned int IMG_WIDTH = std::stoul(argv[2]);
   const unsigned int IMG_HEIGHT = std::stoul(argv[3]);
   const auto IMG_NAME = argv[1] == nullptr ? "unname" : std::string(argv[1]);
+
+  // ------ Scene ------
+  CScene scene_01{};
+  {
+    scene_01.camera = CCamera{};
+  }
+  Mesh *meshs{};
+  glm::int32 mesh_count{};
+  scene_01.Rendering({IMG_WIDTH, IMG_HEIGHT}, meshs, &mesh_count);
+  // -------------------
 
   size_t pixel_bytes = IMG_WIDTH * IMG_HEIGHT * CHANNELS * sizeof(unsigned char);
 

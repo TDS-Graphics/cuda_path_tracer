@@ -2,14 +2,9 @@
 
 #include "common.cuh"
 
-struct camera {
+class CCamera {
 public:
-  camera() { initialize(); }
-
-  void rendering(glm::ivec2 _resolution) {
-    resolution = _resolution;
-    aspect_ratio = static_cast<float>(resolution.x) / static_cast<float>(resolution.y);
-  }
+  CCamera() { Initialize(); }
 
   glm::vec3 position;
   glm::vec3 direction;
@@ -19,7 +14,7 @@ public:
   float aspect_ratio;
 
 private:
-  void initialize() {
+  void Initialize() {
     position = {
         0.0f,
         0.0f,
@@ -42,6 +37,4 @@ private:
     };
     fov = 90.0f;
   }
-
-  glm::ivec2 resolution;
 };

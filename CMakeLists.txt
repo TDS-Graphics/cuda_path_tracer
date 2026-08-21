@@ -13,6 +13,7 @@ add_executable(${PROJECT_NAME}
         main.cu
         camera.cuh
         common.cuh
+        scene.cuh
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
@@ -20,4 +21,4 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
         CUDA_ARCHITECTURES "75"
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE glm::glm)
+target_link_libraries(${PROJECT_NAME} PRIVATE glm::glm -luuid)
