@@ -6,6 +6,9 @@
 #include <iostream>
 #include <string>
 
+#include <glm/ext/vector_float3.hpp>
+#include <glm/glm.hpp>
+
 #define CHECK_CUDA_ERROR(err)                                                                                          \
   do {                                                                                                                 \
     if (err != cudaSuccess) {                                                                                          \

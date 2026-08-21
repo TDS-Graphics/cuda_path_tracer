@@ -5,22 +5,25 @@ const int CHANNELS = 3; // RGB 3 channels
 
 // ===================== Device-only Function =====================
 
-__device__ void CalculatePixel(float3 *color, int2 resolution, int2 uv) {
-  color->x = uv.x / static_cast<float>(resolution.x - 1);
-  color->y = uv.y / static_cast<float>(resolution.y - 1);
-  color->z = 0.5;
+__device__ void CalculatePixel(glm::vec3 *color, glm::ivec2 resolution, glm::ivec2 uv) {
+  *color = {
+      uv.x / static_cast<float>(resolution.x - 1),
+      uv.y / static_cast<float>(resolution.y - 1),
+      0.5,
+  };
 }
 
-__device__ void CalculatePPM(unsigned char *d_pixels, int2 resolution, int2 uv) {
+__device__ void CalculatePPM(unsigned char *d_pixels, glm::ivec2 resolution, glm::ivec2 uv) {
   // Calculate the index of the current pixel in the flat array
   int pixel_idx = (uv.y * resolution.x + uv.x) * CHANNELS;
 
-  float3 pixel_color{};
-  CalculatePixel(&pixel_color, resolution, uv);
+  glm::vec3 color{};
+  CalculatePixel(&color, resolution, uv);
+  color *= 255.999;
 
-  d_pixels[pixel_idx + 0] = pixel_color.x * 255.999;
-  d_pixels[pixel_idx + 1] = pixel_color.y * 255.999;
-  d_pixels[pixel_idx + 2] = pixel_color.z * 255.999;
+  d_pixels[pixel_idx + 0] = color.x;
+  d_pixels[pixel_idx + 1] = color.y;
+  d_pixels[pixel_idx + 2] = color.z;
 }
 
 // ===================== Global Kernel =====================
